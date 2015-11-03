@@ -6,6 +6,13 @@ KellyCAN::KellyCAN(CanBus* kellycanbus, uint16_t kellyrequestID, uint16_t kellyr
 	canbus = kellycanbus;
 	requestID = kellyrequestID;
 	responseID = kellyresponseID;
+	module_name[8]='\0';
+	module_ver[3]='\0';
+	response_pending = 0;
+	request_time = 0;
+	timeout = 1000000;
+    processError = false;
+
 }
 
 
@@ -28,20 +35,9 @@ bool KellyCAN::request(tCAN* message){
 
 
 bool KellyCAN::receive(tCAN* message){
-
-	bool retval = false;
-	if(canbus->receive(message)){
-		if(message->id == responseID){	//it's for us, kelly state closed ready for next message.
-			response_pending = 0;
-			processMessage(message);  //process the message here
-		}else{
-			if(micros() - request_time >= timeout){
-				response_pending = 2;	//timed out
-			}
-		}
-	retval = true;	//return true for any valid message
-	}
-	return retval;
+	response_pending = 0;  //it's for us, kelly state closed ready for next message.
+	processMessage(message);  //process the message here
+	return true;
 }
 
 
@@ -121,9 +117,11 @@ void KellyCAN::processMessage(tCAN *message){
 			}
 		break;
 		case CCP_MONITOR2:
-			if(message->header.length == 3){
-				mech_rpm = ((uint16_t)message->data[0])<<8 + message->data[1];
+			//if(message->header.length == 3){
+			if(message->header.length == 5){	//the datasheet lies!
+				mech_rpm = (((uint16_t)(message->data[0]))<<8) + ((uint16_t)(message->data[1]));
 				current_pc = message->data[2];
+
 			}else{
 				processError = true;
 			}
@@ -149,9 +147,15 @@ bool KellyCAN::get_intercepted(){
 	return response_pending == 0;
 }
 bool KellyCAN::get_waiting(){
+	if(micros() - request_time >= timeout){
+		response_pending = 2;	//timed out
+	}
 	return response_pending == 1;
 }
 bool KellyCAN::get_timed_out(){
+	if(micros() - request_time >= timeout){
+		response_pending = 2;	//timed out
+	}
 	return response_pending == 2;
 }
 
@@ -270,10 +274,11 @@ bool CanBus::receive (tCAN* message){
         {
         	//distribute messages here.
         	for(int i=0; i<n_callbacks; i++){
-        		if(message.id == callbackID[i]){
+        		if(message->id == callbackID[i]){
         			(*callback[i])(message);
         		}
         	}
+
         	return true;
         }
     }
@@ -282,7 +287,9 @@ bool CanBus::receive (tCAN* message){
 
 bool CanBus::set_callback(uint16_t messageID, bool (*new_callback)(tCAN* message)) {
 	if(n_callbacks < MAX_CAN_CALLBACKS){
-		(*callback)(tCAN* message)[n_callbacks++] = new_callback;
+		callbackID[n_callbacks] = messageID;
+		(callback[n_callbacks])= new_callback;
+		n_callbacks++;
 	}
 
 }

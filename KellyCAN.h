@@ -33,7 +33,7 @@
 	//com_sw_*
 #define COM_READING 0 //not used
 
-#define MAX_CAN_CALLBACKS 8;
+#define MAX_CAN_CALLBACKS 8
 class CanBus{
 	public:
 		char init();
@@ -116,8 +116,8 @@ class KellyCAN{
 
 
 		//ccp_flash_read
-        char module_name[8];
-        char module_ver[2];
+        char module_name[9];
+        char module_ver[3];
 		uint8_t throttle_deadzone_low;
         uint8_t throttle_deadzone_high;
 		uint8_t brake_deadzone_low;
