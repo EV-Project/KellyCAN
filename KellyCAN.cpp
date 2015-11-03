@@ -15,11 +15,14 @@ KellyCAN::KellyCAN(CanBus* kellycanbus, uint16_t kellyrequestID, uint16_t kellyr
 
 }
 
-
-bool KellyCAN::request(tCAN* message){
+void KellyCAN::checktimeout(){
 	if(micros() - request_time >= timeout){
 		response_pending = 2;	//timed out
 	}
+}
+
+bool KellyCAN::request(tCAN* message){
+	checktimeout();
 	if(response_pending != 1){	//the kelly is stateful. don't confuse it.
 		if(message->id == requestID){	//messages to other devices should bypass the kelly lib
 			if(canbus->transmit(message)){
@@ -147,15 +150,11 @@ bool KellyCAN::get_intercepted(){
 	return response_pending == 0;
 }
 bool KellyCAN::get_waiting(){
-	if(micros() - request_time >= timeout){
-		response_pending = 2;	//timed out
-	}
+	checktimeout();
 	return response_pending == 1;
 }
 bool KellyCAN::get_timed_out(){
-	if(micros() - request_time >= timeout){
-		response_pending = 2;	//timed out
-	}
+	checktimeout();
 	return response_pending == 2;
 }
 

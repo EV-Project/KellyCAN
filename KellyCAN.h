@@ -110,6 +110,7 @@ class KellyCAN{
     	uint32_t request_time;// = 0;
     	uint32_t timeout;// = 10000;
     	tCAN outgoing;// = {DEF_REQUEST_ID,{0,3},0xF2,64,8,0,0,0,0,0};	//the message that went out last.
+    	void checktimeout();
 
         bool processError;// = false;
         void processMessage(tCAN *message);
