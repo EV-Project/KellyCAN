@@ -2,7 +2,17 @@
 #include "KellyCAN.h"
 
 
-KellyCAN::KellyCAN(CanBus* kellycanbus, uint16_t kellyrequestID, uint16_t kellyresponseID){
+/*
+typedef struct CAN_message_t {
+  uint32_t id; // can identifier
+  uint8_t ext; // identifier is extended
+  uint8_t len; // length of data
+  uint16_t timeout; // milliseconds, zero will disable waiting
+  uint8_t buf[8];
+} CAN_message_t;
+*/
+
+KellyCAN::KellyCAN(CANcallbacks *kellycanbus, uint16_t kellyrequestID, uint16_t kellyresponseID){
 	canbus = kellycanbus;
 	requestID = kellyrequestID;
 	responseID = kellyresponseID;
@@ -10,7 +20,7 @@ KellyCAN::KellyCAN(CanBus* kellycanbus, uint16_t kellyrequestID, uint16_t kellyr
 	module_ver[3]='\0';
 	response_pending = 0;
 	request_time = 0;
-	timeout = 1000000;
+	timeout = 1000;
     processError = false;
 
 }
@@ -21,12 +31,12 @@ void KellyCAN::checktimeout(){
 	}
 }
 
-bool KellyCAN::request(tCAN* message){
+bool KellyCAN::request(CAN_message_t &message){
 	checktimeout();
 	if(response_pending != 1){	//the kelly is stateful. don't confuse it.
-		if(message->id == requestID){	//messages to other devices should bypass the kelly lib
+		if(message.id == requestID){	//messages to other devices should bypass the kelly lib
 			if(canbus->transmit(message)){
-				memcpy(&outgoing, message, sizeof(tCAN));
+				memcpy(&outgoing, &message, sizeof(CAN_message_t));
 				response_pending = 1;
 				request_time = micros();
 				return true;
@@ -37,7 +47,7 @@ bool KellyCAN::request(tCAN* message){
 }
 
 
-bool KellyCAN::receive(tCAN* message){
+bool KellyCAN::receive(CAN_message_t &message){
 	response_pending = 0;  //it's for us, kelly state closed ready for next message.
 	processMessage(message);  //process the message here
 	return true;
@@ -49,94 +59,94 @@ int KellyCAN::dataReady(){
 }
 
 
-void KellyCAN::processMessage(tCAN *message){
+void KellyCAN::processMessage(CAN_message_t &message){
 	processError = false;
-	switch(outgoing.data[0]){
+	switch(outgoing.buf[0]){
 		case CCP_FLASH_READ:
-		switch(outgoing.data[1]){
+		switch(outgoing.buf[1]){
 			case INFO_MODULE_NAME:
-			if(message->header.length == 8){
-				memcpy(module_name, message->data, 8);
+			if(message.len == 8){
+				memcpy(module_name, message.buf, 8);
 			}else{
 				processError = true;
 			}
 			break;
 			case INFO_SOFTWARE_VER:
-			if(message->header.length == 2){
-				memcpy(module_ver, message->data, 2);
+			if(message.len == 2){
+				memcpy(module_ver, message.buf, 2);
 			}else{
 				processError = true;
 			}
 			break;
 			case CAL_TPS_DEAD_ZONE_LOW:
-				throttle_deadzone_low = message->data[0];
+				throttle_deadzone_low = message.buf[0];
 			break;
 			case CAL_TPS_DEAD_ZONE_HIGH:
-				throttle_deadzone_high = message->data[0];
+				throttle_deadzone_high = message.buf[0];
 			break;
 			case CAL_BRAKE_DEAD_ZONE_LOW:
-				brake_deadzone_low = message->data[0];
+				brake_deadzone_low = message.buf[0];
 			break;
 			case CAL_BRAKE_DEAD_ZONE_HIGH:
-				brake_deadzone_high = message->data[0];
+				brake_deadzone_high = message.buf[0];
 			break;
 			default:
 				processError = true;
 		}
 		break;
 		case CCP_A2D_BATCH_READ1:
-			if(message->header.length == 5){
-				brake_pot = message->data[0];
-        		throttle_pot = message->data[1];
-        		operation_voltage = message->data[2];
-        		signal_voltage = message->data[3];
-        		battery_voltage = message->data[4];
+			if(message.len == 5){
+				brake_pot = message.buf[0];
+        		throttle_pot = message.buf[1];
+        		operation_voltage = message.buf[2];
+        		signal_voltage = message.buf[3];
+        		battery_voltage = message.buf[4];
 			}else{
 				processError = true;
 			}
 		break;
 		case CCP_A2D_BATCH_READ2:
-			if(message->header.length == 6){
-				current_A = message->data[0];
-				current_B = message->data[1];
-				current_C = message->data[2];
-				voltage_A = message->data[3];
-				voltage_B = message->data[4];
-				voltage_C = message->data[5];
+			if(message.len == 6){
+				current_A = message.buf[0];
+				current_B = message.buf[1];
+				current_C = message.buf[2];
+				voltage_A = message.buf[3];
+				voltage_B = message.buf[4];
+				voltage_C = message.buf[5];
 			}else{
 				processError = true;
 			}
 		break;
 		case CCP_MONITOR1:
-			if(message->header.length == 6){
-				pwm_output = message->data[0];
-				motor_enable = message->data[1];
-				motor_temp = message->data[2];
-				kelly_temp = message->data[3];
-				hfet_temp = message->data[4];
-				lfet_temp = message->data[5];
+			if(message.len == 6){
+				pwm_output = message.buf[0];
+				motor_enable = message.buf[1];
+				motor_temp = message.buf[2];
+				kelly_temp = message.buf[3];
+				hfet_temp = message.buf[4];
+				lfet_temp = message.buf[5];
 			}else{
 				processError = true;
 			}
 		break;
 		case CCP_MONITOR2:
-			//if(message->header.length == 3){
-			if(message->header.length == 5){	//the datasheet lies!
-				mech_rpm = (((uint16_t)(message->data[0]))<<8) + ((uint16_t)(message->data[1]));
-				current_pc = message->data[2];
+			//if(message.len == 3){
+			if(message.len == 5){	//the datasheet lies!
+				mech_rpm = (((uint16_t)(message.buf[0]))<<8) + ((uint16_t)(message.buf[1]));
+				current_pc = message.buf[2];
 
 			}else{
 				processError = true;
 			}
 		break;
 		case COM_SW_ACC:
-			throttle_switch = message->data[0] == 1;
+			throttle_switch = message.buf[0] == 1;
 		break;
 		case COM_SW_BRK:
-			brake_switch = message->data[0] == 1;
+			brake_switch = message.buf[0] == 1;
 		break;
 		case COM_SW_REV:
-			reverse_switch = message->data[0] == 1;
+			reverse_switch = message.buf[0] == 1;
 		break;
 		default:
 			processError = true;
@@ -253,27 +263,31 @@ bool KellyCAN::get_reverse_switch(){
 
 
 
-
-
-char CanBus::init(){
-    return mcp2515_init(CANSPEED_1000);
+CANcallbacks::CANcallbacks(FlexCAN *_CANbus){
+    //return mcp2515_init(CANSPEED_1000);
+    CANbus = _CANbus;
     n_callbacks = 0;
 }
-bool CanBus::transmit (tCAN* message){
-    mcp2515_bit_modify(CANCTRL, (1<<REQOP2)|(1<<REQOP1)|(1<<REQOP0), 0);
-    if (mcp2515_send_message(message)) {
-    	return true;
-	}
-	return false;
+
+bool CANcallbacks::transmit (CAN_message_t &message){
+    //mcp2515_bit_modify(CANCTRL, (1<<REQOP2)|(1<<REQOP1)|(1<<REQOP0), 0);
+    //if (mcp2515_send_message(message)) {
+    //	return true;
+	//}
+	//return false;
+	CANbus->write(message);
+	return true;
 }
-bool CanBus::receive (tCAN* message){
-	if (mcp2515_check_message()) 
+
+bool CANcallbacks::receive (CAN_message_t &message){
+	
+	if (CANbus->available()) 
     {
-        if (mcp2515_get_message(message)) 
+        if (CANbus->read(message)) 
         {
         	//distribute messages here.
         	for(int i=0; i<n_callbacks; i++){
-        		if(message->id == callbackID[i]){
+        		if(message.id == callbackID[i]){
         			(*callback[i])(message);
         		}
         	}
@@ -284,11 +298,13 @@ bool CanBus::receive (tCAN* message){
     return false;
 }
 
-bool CanBus::set_callback(uint16_t messageID, bool (*new_callback)(tCAN* message)) {
+bool CANcallbacks::set_callback(uint16_t messageID, bool (*new_callback)(CAN_message_t &message)) {
 	if(n_callbacks < MAX_CAN_CALLBACKS){
 		callbackID[n_callbacks] = messageID;
 		(callback[n_callbacks])= new_callback;
 		n_callbacks++;
+		return true;
 	}
+	return false;
 
 }

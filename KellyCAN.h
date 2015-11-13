@@ -2,13 +2,20 @@
 #define KELLYCAN_H
 #include <inttypes.h>
 #include <Arduino.h> // Arduino 1.0
-#include <mcp2515.h>
-#include <mcp2515_defs.h>
 
-#define CANSPEED_125 	7		// CAN speed at 125 Kbps
-#define CANSPEED_250  	3		// CAN speed at 250 Kbps
-#define CANSPEED_500	1		// CAN speed at 500 Kbps
-#define CANSPEED_1000	0		// CAN speed at 1 Mbps
+#include <FlexCAN.h>
+
+/*
+//MCP2515 specific stuff
+//#include <mcp2515.h>
+//#include <mcp2515_defs.h>
+
+//#define CANSPEED_125 	7		// CAN speed at 125 Kbps
+//#define CANSPEED_250  	3		// CAN speed at 250 Kbps
+//#define CANSPEED_500	1		// CAN speed at 500 Kbps
+//#define CANSPEED_1000	0		// CAN speed at 1 Mbps
+*/
+
 
 #define DEF_REQUEST_ID 107
 #define DEF_RESPONSE_ID 115
@@ -34,25 +41,33 @@
 #define COM_READING 0 //not used
 
 #define MAX_CAN_CALLBACKS 8
-class CanBus{
+
+
+
+
+
+
+class CANcallbacks{
 	public:
-		char init();
-		bool transmit (tCAN* message);
-		bool receive (tCAN* message);
-		bool set_callback(uint16_t messageID, bool (*new_callback)(tCAN* message));
-	private:
-		int n_callbacks;
+        CANcallbacks(FlexCAN *_CANbus);
+		//char init();
+		bool transmit (CAN_message_t &message);
+        bool receive (CAN_message_t &message);
+        bool set_callback(uint16_t messageID, bool (*new_callback)(CAN_message_t &message));
+    private:
+        int n_callbacks;
+        FlexCAN *CANbus;
 		uint16_t callbackID[MAX_CAN_CALLBACKS];
-		bool (*callback[MAX_CAN_CALLBACKS])(tCAN* message);
+		bool (*callback[MAX_CAN_CALLBACKS])(CAN_message_t &message);
 
 };
 
 class KellyCAN{
     public:
-		KellyCAN(CanBus* kellycanbus, uint16_t kellyrequestID, uint16_t kellyresponseID);
+		KellyCAN(CANcallbacks *kellycanbus, uint16_t kellyrequestID, uint16_t kellyresponseID);
 
-		bool request(tCAN* message);
-        bool receive(tCAN* message);	//wrapper that intercepts response packets
+		bool request(CAN_message_t &message);
+        bool receive(CAN_message_t &message);	//wrapper that intercepts response packets
         int dataReady();
 
 		//ccp_flash_read
@@ -102,18 +117,18 @@ class KellyCAN{
 		bool get_waiting();
 
     private:
-		CanBus* canbus;
+		CANcallbacks *canbus;
 		uint16_t requestID;// = DEF_REQUEST_ID;	//sane defaults
 		uint16_t responseID;// = DEF_RESPONSE_ID;
 
     	int response_pending;// = 0;
     	uint32_t request_time;// = 0;
     	uint32_t timeout;// = 10000;
-    	tCAN outgoing;// = {DEF_REQUEST_ID,{0,3},0xF2,64,8,0,0,0,0,0};	//the message that went out last.
+    	CAN_message_t outgoing;// = {DEF_REQUEST_ID,{0,3},0xF2,64,8,0,0,0,0,0};	//the message that went out last.
     	void checktimeout();
 
         bool processError;// = false;
-        void processMessage(tCAN *message);
+        void processMessage(CAN_message_t &message);
 
 
 		//ccp_flash_read
