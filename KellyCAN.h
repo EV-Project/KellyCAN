@@ -4,18 +4,7 @@
 #include <Arduino.h> // Arduino 1.0
 
 #include <FlexCAN.h>
-
-/*
-//MCP2515 specific stuff
-//#include <mcp2515.h>
-//#include <mcp2515_defs.h>
-
-//#define CANSPEED_125 	7		// CAN speed at 125 Kbps
-//#define CANSPEED_250  	3		// CAN speed at 250 Kbps
-//#define CANSPEED_500	1		// CAN speed at 500 Kbps
-//#define CANSPEED_1000	0		// CAN speed at 1 Mbps
-*/
-
+#include <CANcallbacks.h>
 
 #define DEF_REQUEST_ID 107
 #define DEF_RESPONSE_ID 115
@@ -37,61 +26,43 @@
 #define CAL_TPS_DEAD_ZONE_HIGH 5
 #define CAL_BRAKE_DEAD_ZONE_LOW 38
 #define CAL_BRAKE_DEAD_ZONE_HIGH 39
-	//com_sw_*
+    //com_sw_*
 #define COM_READING 0 //not used
 
-#define MAX_CAN_CALLBACKS 8
 
 
-
-
-
-
-class CANcallbacks{
-	public:
-        CANcallbacks(FlexCAN *_CANbus);
-		//char init();
-		bool transmit (CAN_message_t &message);
-        bool receive (CAN_message_t &message);
-        bool set_callback(uint16_t messageID, bool (*new_callback)(CAN_message_t &message));
-    private:
-        int n_callbacks;
-        FlexCAN *CANbus;
-		uint16_t callbackID[MAX_CAN_CALLBACKS];
-		bool (*callback[MAX_CAN_CALLBACKS])(CAN_message_t &message);
-
-};
 
 class KellyCAN{
     public:
-		KellyCAN(CANcallbacks *kellycanbus, uint16_t kellyrequestID, uint16_t kellyresponseID);
+        KellyCAN(CANcallbacks *kellycanbus, uint16_t kellyrequestID, uint16_t kellyresponseID);
 
-		bool request(CAN_message_t &message);
-        bool receive(CAN_message_t &message);	//wrapper that intercepts response packets
+        bool request(CAN_message_t &message);
+        //bool receive(CAN_message_t &message); //wrapper that intercepts response packets
+        void processMessage(CAN_message_t &message);
         int dataReady();
 
-		//ccp_flash_read
+        //ccp_flash_read
         char* get_module_name();
         char* get_module_ver();
-		uint8_t get_throttle_deadzone_low();
+        uint8_t get_throttle_deadzone_low();
         uint8_t get_throttle_deadzone_high();
-		uint8_t get_brake_deadzone_low();
+        uint8_t get_brake_deadzone_low();
         uint8_t get_brake_deadzone_high();
 
-		//CCP_A2D_BATCH_READ1
+        //CCP_A2D_BATCH_READ1
         uint8_t get_brake_pot();
         uint8_t get_throttle_pot();
         uint8_t get_operation_voltage();
-        uint8_t	get_signal_voltage();
-        uint8_t get_battery_voltage();        
+        uint8_t get_signal_voltage();
+        uint8_t get_battery_voltage();
         
-		//CCP_A2D_BATCH_READ2
+        //CCP_A2D_BATCH_READ2
         uint8_t get_current_A();
         uint8_t get_current_B();
         uint8_t get_current_C();
         uint8_t get_voltage_A();
-		uint8_t get_voltage_B();
-		uint8_t get_voltage_C();
+        uint8_t get_voltage_B();
+        uint8_t get_voltage_C();
 
         //ccp_monitor1
         uint8_t get_pwm_output();
@@ -111,24 +82,23 @@ class KellyCAN{
         bool get_reverse_switch();
 
 
-		bool get_process_error();
-		bool get_intercepted();
-		bool get_timed_out();
-		bool get_waiting();
+        bool get_process_error();
+        bool get_intercepted();
+        bool get_timed_out();
+        bool get_waiting();
 
     private:
-		CANcallbacks *canbus;
-		uint16_t requestID;// = DEF_REQUEST_ID;	//sane defaults
-		uint16_t responseID;// = DEF_RESPONSE_ID;
+        CANcallbacks *canbus;
+        uint16_t requestID;// = DEF_REQUEST_ID; //sane defaults
+        uint16_t responseID;// = DEF_RESPONSE_ID;
 
-    	int response_pending;// = 0;
-    	uint32_t request_time;// = 0;
-    	uint32_t timeout;// = 10000;
-    	CAN_message_t outgoing;// = {DEF_REQUEST_ID,{0,3},0xF2,64,8,0,0,0,0,0};	//the message that went out last.
-    	void checktimeout();
+        int response_pending;// = 0;
+        uint32_t request_time;// = 0;
+        uint32_t timeout;// = 10000;
+        CAN_message_t outgoing;// = {DEF_REQUEST_ID,{0,3},0xF2,64,8,0,0,0,0,0}; //the message that went out last.
+        void checktimeout();
 
         bool processError;// = false;
-        void processMessage(CAN_message_t &message);
 
 
 		//ccp_flash_read
@@ -171,10 +141,7 @@ class KellyCAN{
         bool brake_switch;
         bool reverse_switch;
 
-
 };
-
-
 
 
 #endif
